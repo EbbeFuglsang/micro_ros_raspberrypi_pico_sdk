@@ -9,14 +9,53 @@
 #include "pico/stdlib.h"
 
 const uint LED_PIN = 25;
+int period = 10;
 
+rcl_subscription_t subscriber;
 rcl_publisher_t publisher;
 std_msgs__msg__Int32 msg;
+std_msgs__msg__Int32 recv_msg;
 
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
 {
     rcl_publish(&publisher, &msg, NULL);
     msg.data++;
+    period++;
+/*    
+	static int toggle = 0;
+	
+	toggle++;
+	if(toggle%2){
+		gpio_put(LED_PIN, 1);
+	}else{
+		gpio_put(LED_PIN, 0);
+	}    
+  */  
+}
+
+void timer_blinky_callback(rcl_timer_t *timer, int64_t last_call_time)
+{
+	static int cnt = 0;
+	
+	cnt++;
+	if(cnt<period/2){
+		gpio_put(LED_PIN, 1);
+	}else{
+		gpio_put(LED_PIN, 0);
+	}
+	if(cnt >= period){
+		cnt = 0;
+	}
+}
+
+void subscription_callback(const void * msgin)
+{
+/*
+	const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
+	printf("Received: %d\n", msg->data);
+	*/
+	const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
+	period = msg->data;
 }
 
 int main()
@@ -25,6 +64,8 @@ int main()
     gpio_set_dir(LED_PIN, GPIO_OUT);
 
     rcl_timer_t timer;
+    rcl_timer_t timer_blinky;
+    
     rcl_node_t node;
     rcl_allocator_t allocator;
     rclc_support_t support;
@@ -33,12 +74,19 @@ int main()
     allocator = rcl_get_default_allocator();
     rclc_support_init(&support, 0, NULL, &allocator);
 
-    rclc_node_init_default(&node, "pico_node", "", &support);
+    rclc_node_init_default(&node, "tool_node", "", &support);
     rclc_publisher_init_default(
         &publisher,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-        "pico_publisher");
+        "tool_publisher");
+
+    rclc_subscription_init_default(
+	&subscriber,
+	&node,
+	ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
+	"RTDE_int32_subscriber");        
+        
 
     rclc_timer_init_default(
         &timer,
@@ -46,8 +94,18 @@ int main()
         RCL_MS_TO_NS(1000),
         timer_callback);
 
-    rclc_executor_init(&executor, &support.context, 1, &allocator);
+    rclc_timer_init_default(
+        &timer_blinky,
+        &support,
+        RCL_MS_TO_NS(100),
+        timer_blinky_callback);        
+        
+
+    rclc_executor_init(&executor, &support.context, 3, &allocator);
     rclc_executor_add_timer(&executor, &timer);
+    rclc_executor_add_timer(&executor, &timer_blinky);
+    rclc_executor_add_subscription(&executor, &subscriber, &recv_msg, &subscription_callback, ON_NEW_DATA);
+
 
     gpio_put(LED_PIN, 1);
 
