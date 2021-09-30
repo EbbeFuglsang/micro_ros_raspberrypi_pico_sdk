@@ -22,7 +22,7 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
 {
     rcl_ret_t ret = rcl_publish(&publisher, &msg, NULL);
     msg.data++;
-    period++;
+    //period++;
 /*    
 	static int toggle = 0;
 	
@@ -48,6 +48,7 @@ void timer_blinky_callback(rcl_timer_t *timer, int64_t last_call_time)
 	if(cnt >= period){
 		cnt = 0;
 	}
+	
 }
 
 void subscription_callback(const void * msgin)
@@ -56,8 +57,25 @@ void subscription_callback(const void * msgin)
 	const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
 	printf("Received: %d\n", msg->data);
 	*/
-	const std_msgs__msg__Int32 * msg = (const std_msgs__msg__Int32 *)msgin;
-	period = msg->data;
+	const double * msg = (const double *)msgin;
+	period = (int)1/(*msg);
+	
+	
+	/*
+	static int cnt = 0;
+	
+	cnt++;
+	if(cnt<period/2){
+		gpio_put(LED_PIN, 1);
+	}else{
+		gpio_put(LED_PIN, 0);
+	}
+	if(cnt >= period){
+		cnt = 0;
+	}	
+	*/
+	
+	
 }
 
 int main()
@@ -109,7 +127,7 @@ int main()
 	&subscriber,
 	&node,
 	ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-	"RTDE_int32_subscriber");        
+	"UR20215300001/speed_scaling");        
         
 
     rclc_timer_init_default(
